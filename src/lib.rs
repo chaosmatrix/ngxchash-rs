@@ -3,6 +3,7 @@
 
 use std::cmp::{Ordering};
 use std::fmt;
+use std::error::Error;
 
 // CRC32Table
 pub const CRC32_TABLE:[u32;256] = [
@@ -209,11 +210,7 @@ pub fn ngx_chash_upstream(servers: &Vec<ServerS>) -> Vec<HashPointS>{
 }
 
 pub fn ngx_chash(server: &String, weight: u32) -> Vec<HashPointS> {
-    // TODO
-    //  better implemation
-    let mid:usize = server.find(":").unwrap();
-    let host:String = server[..mid].to_owned();
-    let port:String = server[mid+1..].to_owned();
+    let (host, port) = split_host_port(server).unwrap();
 
     let mut hash:u32 = CRC32_INIT;
 
@@ -239,6 +236,36 @@ pub fn ngx_chash(server: &String, weight: u32) -> Vec<HashPointS> {
     }
 
     hashs
+}
+
+// Self define Error
+#[derive(Debug)]
+struct MessageError {
+    err_msg: String,
+}
+
+impl fmt::Display for MessageError {
+    fn fmt(&self, f:&mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.err_msg)
+    }
+}
+
+impl <'a>Error for MessageError {
+    fn description(&self) -> &str {
+        &(self.err_msg)
+    }
+}
+
+fn split_host_port(hostport: &str) -> Result<(&str, &str), Box<dyn Error>> {
+
+    match hostport.rfind(":"){
+        Some(_rindex) => {
+            return Ok((&hostport[.._rindex], &hostport[_rindex+1..]));
+        },
+        _ => {
+            return Err(Box::new(MessageError{ err_msg: fmt::format(format_args!("can't parse host port from '{}'", hostport))}));
+        },
+    };
 }
 
 fn remove_duplicate(hashs: &mut Vec<HashPointS>) {
